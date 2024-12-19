@@ -1,0 +1,8 @@
+@import "custom";
+@import "~bootstrap/scss/bootstrap";
+$bootstrap-icons-font-dir: "~bootstrap-icons/font/fonts";
+@import "~bootstrap-icons/font/bootstrap-icons.scss";
+
+#section-preview-container a.disabled {
+    color: #d3d3d3;
+}

@@ -1,9 +1,12 @@
 {
-  "compilerOptions": {
-    "rootDir": "src",
-    "target": "es6",
-    "module": "commonjs",
-    "esModuleInterop": true,
-    "strict": true
-  }
+    "compilerOptions": {
+        "rootDir": "src",
+        "target": "es6",
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "esModuleInterop": true,
+        "sourceMap": true,
+        "strict": true,
+        "verbatimModuleSyntax": true,
+    }
 }

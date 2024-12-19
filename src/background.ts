@@ -1,21 +1,51 @@
 'use strict';
+const BEAR_VALLEY_ORIGIN = 'https://cali-pass.control-room.te2.io';
 
-// With background scripts you can communicate with popup
-// and contentScript files.
-// For more information on background script,
-// See https://developer.chrome.com/extensions/background_pages
+// Allows users to open the side panel by clicking on the action toolbar icon
+chrome.sidePanel
+    .setPanelBehavior({ openPanelOnActionClick: true })
+    .catch((error) => console.error(error));
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === 'GREETINGS') {
-    const message: string = `Hi ${
-      sender.tab ? 'Con' : 'Pop'
-    }, my name is Bac. I am from Background. It's great to hear from you.`;
-
-    // Log message coming from the `request` parameter
-    console.log(request.payload.message);
-    // Send a response message
-    sendResponse({
-      message,
-    });
-  }
+chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
+    if (!tab.url) return;
+    const url: URL = new URL(tab.url);
+    // Enables the side panel on google.com
+    if (url.origin === BEAR_VALLEY_ORIGIN) {
+        await chrome.sidePanel.setOptions({
+            tabId,
+            path: 'sidepanel.html',
+            enabled: true,
+        });
+    } else {
+        // Disables the side panel on all other sites
+        await chrome.sidePanel.setOptions({
+            tabId,
+            enabled: false,
+        });
+    }
 });
+
+const forwardedMessages = ['applyChanges', 'getTrailData'];
+function handleMessages(
+    message: any,
+    sender: chrome.runtime.MessageSender,
+    sendResponse: (response?: any) => void
+) {
+    if ('type' in message && forwardedMessages.indexOf(message.type) !== -1) {
+        chrome.tabs.query(
+            { active: true, currentWindow: true },
+            function (tabs) {
+                if (tabs.length !== 0 && tabs[0].id !== undefined) {
+                    chrome.tabs.sendMessage(tabs[0].id, message);
+                }
+            }
+        );
+        return false;
+    }
+
+    return false;
+}
+
+chrome.runtime.onMessage.addListener(handleMessages);
+
+export {};

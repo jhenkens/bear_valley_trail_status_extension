@@ -1,33 +1,32 @@
 {
-  "manifest_version": 3,
-  "name": "Bear_valley_trail_status_extension",
-  "version": "0.1.0",
-  "description": "My Chrome Extension",
-  "icons": {
-    "16": "icons/icon_16.png",
-    "32": "icons/icon_32.png",
-    "48": "icons/icon_48.png",
-    "128": "icons/icon_128.png"
-  },
-  "background": {
-    "service_worker": "background.js"
-  },
-  "action": {
-    "default_title": "Bear_valley_trail_status_extension",
-    "default_popup": "popup.html"
-  },
-  "permissions": [
-    "storage"
-  ],
-  "content_scripts": [
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "run_at": "document_idle",
-      "js": [
-        "contentScript.js"
-      ]
-    }
-  ]
+    "name": "Bear Valley Trail Status Helper",
+    "description": "Extension to help manage the trail and lift status on Bear Valley's website",
+    "version": "0.1.1",
+    "manifest_version": 3,
+    "icons": {
+        "32": "icons/icon_32.png",
+        "128": "icons/icon_128.png",
+        "256": "icons/icon_256.png",
+        "512": "icons/icon_512.png"
+    },
+    "background": {
+        "service_worker": "background.js"
+    },
+    "action": {
+        "default_title": "Click to open panel"
+    },
+    "permissions": ["storage", "nativeMessaging", "sidePanel"],
+    "host_permissions": ["*://cali-pass.control-room.te2.io/*"],
+    "content_scripts": [
+        {
+            "matches": ["*://cali-pass.control-room.te2.io/*"],
+            "js": ["inject.js", "contentScript.js"]
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": ["injected.js"],
+            "matches": ["*://cali-pass.control-room.te2.io/*"]
+        }
+    ]
 }

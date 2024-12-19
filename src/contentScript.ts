@@ -1,44 +1,53 @@
-'use strict';
+import { getTrailsFromDom, getTrailsListTable } from './util/loaders';
+import { buildDomObserver, debounce, trNodeMutationFilter } from './util/util';
 
-// Content script file will run in the context of web page.
-// With content script you can manipulate the web pages using
-// Document Object Model (DOM).
-// You can also pass information to the parent extension.
+// Event listener
+function handleMessages(
+    message: any,
+    sender: chrome.runtime.MessageSender,
+    sendResponse: (response?: any) => void
+) {
+    if (message.type === 'getTrailData') {
+        sendTrailDataDebounced();
+        return false;
+    }
+    return false;
+}
 
-// We execute this script by making an entry in manifest.json file
-// under `content_scripts` property
+chrome.runtime.onMessage.addListener(handleMessages);
 
-// For more information on Content Scripts,
-// See https://developer.chrome.com/extensions/content_scripts
+function sendTrailData() {
+    const trails = getTrailsFromDom(getTrailsListTable()!);
+    if (trails.length === 0) {
+        return;
+    }
+    const firstRow = trails[0].domRow!;
+    const stateDoc = firstRow.querySelector('td.col-status-override')!;
+    const selectedState =
+        stateDoc.querySelector('div.selection-text')!.textContent!;
+    const otherStates = [...stateDoc.querySelectorAll('li span')].map(
+        (a) => a!.textContent
+    );
+    const allStates = new Set([selectedState, ...otherStates]);
+    const states = [...allStates]
+        .map((a) => a!.trim().toLowerCase())
+        .filter((a) => a !== '' && a !== '-')
+        .sort();
+    const sections = new Set();
+    trails.forEach((trail) => {
+        if (trail.section !== null) {
+            sections.add(trail.section);
+        }
+    });
 
-// Log `title` of current active web page
-const pageTitle: string =
-  document.head.getElementsByTagName('title')[0].innerHTML;
-console.log(
-  `Page title is: '${pageTitle}' - evaluated by Chrome extension's 'contentScript.js' file`
-);
+    chrome.runtime.sendMessage({
+        type: 'trailData',
+        sections: [...sections],
+        states,
+        trails: trails.map((trail) => trail.toJsonObject()),
+    });
+}
 
-// Communicate with background file by sending a message
-chrome.runtime.sendMessage(
-  {
-    type: 'GREETINGS',
-    payload: {
-      message: 'Hello, my name is Con. I am from ContentScript.',
-    },
-  },
-  (response) => {
-    console.log(response.message);
-  }
-);
-
-// Listen for message
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === 'COUNT') {
-    console.log(`Current count is ${request.payload.count}`);
-  }
-
-  // Send an empty response
-  // See https://github.com/mozilla/webextension-polyfill/issues/130#issuecomment-531531890
-  sendResponse({});
-  return true;
-});
+const sendTrailDataDebounced = debounce(sendTrailData);
+buildDomObserver(sendTrailDataDebounced, trNodeMutationFilter);
+export {};
