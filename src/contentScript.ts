@@ -13,7 +13,7 @@ function handleMessages(
     sender: chrome.runtime.MessageSender,
     sendResponse: (response?: any) => void
 ) {
-    if (message === null ||  message === undefined || !('type' in message)) {
+    if (message === null || message === undefined || !('type' in message)) {
         return false;
     }
     if (message.type === 'getTrailData') {
@@ -68,9 +68,20 @@ function getTrailData() {
 
 async function applyChange(change: Change) {
     const table = getTrailsListTable()!;
-    const changeRowSection = table.querySelector(
-        `#${change.trail.idForSection()}`
-    )!;
+    var changeRowSection: HTMLTableCellElement | null = null;
+    var count = 10;
+    while (changeRowSection === null && --count > 0) {
+        changeRowSection = table.querySelector(
+            `#${change.trail.idForSection()}`
+        )!;
+        if(changeRowSection === null){
+            await sleep(1000);
+        }
+    }
+    if(changeRowSection === null){
+        console.error('Could not find change row', change);
+        return;
+    }
     const changeRow = changeRowSection.closest('tr')!;
     changeRow.scrollIntoView();
     const statusOverride = changeRow.querySelector('td.col-status-override')!;

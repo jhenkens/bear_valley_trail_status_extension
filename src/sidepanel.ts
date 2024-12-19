@@ -196,6 +196,7 @@ function displayChanges() {
                             <span class="visually-hidden">Loading...</span>
                         </div>
                         <i class="d-none bv-done bi bi-check-circle-fill green"></i>
+                        <i class="d-none bv-failed bi bi-x-circle-fill red"></i>
                     </div>
                 </div>
             </a>
@@ -262,7 +263,11 @@ async function applyChanges() {
         await applyChange(change);
         updateProgressBar(++current, changesCount);
         changeRow.querySelector('.bv-applying')!.classList.add('d-none');
-        changeRow.querySelector('.bv-done')!.classList.remove('d-none');
+        if(change.hasChanges()) {
+            changeRow.querySelector('.bv-failed')!.classList.remove('d-none');
+        }else{
+            changeRow.querySelector('.bv-done')!.classList.remove('d-none');
+        }
     }
 }
 
@@ -296,6 +301,7 @@ async function applyChange(change: Change) {
 
     const timeout = Date.now() + 60 * 1000;
     while (Date.now() < timeout) {
+        await sleep(1000);
         const newTrail = getTrailFromState(change.trail.id);
         if (newTrail != null) {
             change.trail = newTrail;
@@ -304,9 +310,13 @@ async function applyChange(change: Change) {
                 return;
             }
         }
-        await sleep(100);
+        getTrailData()
     }
     console.log('Failed to update ' + change.trail.name, change);
+}
+
+function getTrailData(){
+    chrome.runtime.sendMessage({ type: 'getTrailData' }, handleMessages);
 }
 
 window.addEventListener('load', function () {
@@ -316,7 +326,7 @@ window.addEventListener('load', function () {
     document
         .querySelector('#section-preview-apply')!
         .addEventListener('click', applyChanges);
-    chrome.runtime.sendMessage({ type: 'getTrailData' }, handleMessages);
+    getTrailData()
 });
 
 // Event listener
