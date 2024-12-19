@@ -44,17 +44,24 @@ function trNodeMutationFilter(mutation: MutationRecord): boolean {
     if (mutation.addedNodes.length === 0) {
         return false;
     }
-    if (mutation.target.nodeName !== 'TBODY') {
-        return false;
-    }
     const addedNode = mutation.addedNodes[0];
-    if (addedNode.nodeName !== 'TR') {
-        return false;
+    if (mutation.target.nodeName === 'TBODY') {
+        if (addedNode.nodeName === 'TR') {
+            return true;
+        }
     }
-    return true;
-}
+    if (mutation.target.nodeName === 'TR') {
+        const addedElement = <Element>addedNode;
+        if (
+            addedElement.nodeName === 'TD' &&
+            addedElement.classList.contains('col-section')
+        ) {
+            return true;
+        }
+    }
 
-var a = trNodeMutationFilter;
+    return false;
+}
 
 function buildDomObserver(
     func: Function,
@@ -85,8 +92,11 @@ function createElement(input: string) {
 function capitalize(str: string) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
+const sleep = (delay: number) =>
+    new Promise((resolve) => setTimeout(resolve, delay));
 
 export {
+    sleep,
     parseBoolExact,
     compareStrings,
     debounce,

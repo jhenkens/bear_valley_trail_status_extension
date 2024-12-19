@@ -25,7 +25,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
     }
 });
 
-const forwardedMessages = ['applyChanges', 'getTrailData'];
+const forwardedMessages = ['applyChange', 'getTrailData'];
 function handleMessages(
     message: any,
     sender: chrome.runtime.MessageSender,
@@ -36,11 +36,11 @@ function handleMessages(
             { active: true, currentWindow: true },
             function (tabs) {
                 if (tabs.length !== 0 && tabs[0].id !== undefined) {
-                    chrome.tabs.sendMessage(tabs[0].id, message);
+                    chrome.tabs.sendMessage(tabs[0].id, message, sendResponse);
                 }
             }
         );
-        return false;
+        return true;
     }
 
     return false;

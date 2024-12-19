@@ -1,5 +1,11 @@
+import { Change } from './util/change';
 import { getTrailsFromDom, getTrailsListTable } from './util/loaders';
-import { buildDomObserver, debounce, trNodeMutationFilter } from './util/util';
+import {
+    buildDomObserver,
+    debounce,
+    sleep,
+    trNodeMutationFilter,
+} from './util/util';
 
 // Event listener
 function handleMessages(
@@ -7,16 +13,28 @@ function handleMessages(
     sender: chrome.runtime.MessageSender,
     sendResponse: (response?: any) => void
 ) {
-    if (message.type === 'getTrailData') {
-        sendTrailDataDebounced();
+    if (!('type' in message)) {
         return false;
+    }
+    if (message.type === 'getTrailData') {
+        setInterval(() => {
+            sendResponse(getTrailData());
+        }, 50);
+
+        return true;
+    }
+    if (message.type === 'applyChange') {
+        applyChange(Change.fromJsonObject(message.change)).then(() => {
+            sendResponse({ success: true });
+        });
+        return true;
     }
     return false;
 }
 
 chrome.runtime.onMessage.addListener(handleMessages);
 
-function sendTrailData() {
+function getTrailData() {
     const trails = getTrailsFromDom(getTrailsListTable()!);
     if (trails.length === 0) {
         return;
@@ -40,14 +58,47 @@ function sendTrailData() {
         }
     });
 
-    chrome.runtime.sendMessage({
+    return {
         type: 'trailData',
         sections: [...sections],
         states,
         trails: trails.map((trail) => trail.toJsonObject()),
-    });
+    };
 }
 
-const sendTrailDataDebounced = debounce(sendTrailData);
+async function applyChange(change: Change) {
+    const table = getTrailsListTable()!;
+    const changeRowSection = table.querySelector(
+        `#${change.trail.idForSection()}`
+    )!;
+    const changeRow = changeRowSection.closest('tr')!;
+    changeRow.scrollIntoView();
+    const statusOverride = changeRow.querySelector('td.col-status-override')!;
+    const statusOverrideDropdown = statusOverride.querySelector(
+        'div.dropdown-toggle'
+    )!;
+    const statusOverrideSelectedbox: HTMLDivElement = <HTMLDivElement>(
+        statusOverrideDropdown.querySelector('div.select-box')!
+    );
+    statusOverrideSelectedbox.click();
+
+    const statusOverrideDropdownUl = statusOverride.querySelector('ul')!;
+    const statusOverrideSpan = [
+        ...statusOverrideDropdownUl.querySelectorAll('span')!,
+    ].filter(
+        (a) =>
+            a.textContent!.trim().toLowerCase() ===
+            change.changeSet.operationalStatus
+    )[0];
+    const statusOverrideLi = statusOverrideSpan.closest('li')!;
+    const statusOverrideLink = statusOverrideLi.querySelector('a')!;
+
+    await sleep(500);
+    statusOverrideLi.scrollIntoView();
+    statusOverrideLink.click();
+}
+
+const sendTrailDataDebounced = debounce(() => {
+    chrome.runtime.sendMessage(getTrailData());
+});
 buildDomObserver(sendTrailDataDebounced, trNodeMutationFilter);
-export {};

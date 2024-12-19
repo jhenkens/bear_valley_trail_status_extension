@@ -1,12 +1,20 @@
+import { Change } from './util/change';
 import { getIconForTrailRating } from './util/constants';
 import { Trail } from './util/trail';
-import { capitalize, createElement } from './util/util';
+import { capitalize, createElement, sleep } from './util/util';
 require('./sidepanel.scss');
 
-const state: { states: string[]; sections: string[]; trails: Trail[] } = {
+type State = {
+    states: string[];
+    sections: string[];
+    trails: Trail[];
+    changes: Change[];
+};
+const state: State = {
     states: [],
     sections: [],
     trails: [],
+    changes: [],
 };
 
 function addSection(section: string) {
@@ -94,6 +102,10 @@ function addChangeToSection(sectionId: string) {
 }
 
 function previewChanges() {
+    calculateChanges();
+    displayChanges();
+}
+function calculateChanges() {
     const sectionStatusContainer = document.querySelector(
         '#section-changes-container'
     );
@@ -123,7 +135,7 @@ function previewChanges() {
             changesBySection[sectionName] = { sectionId, sectionName, changes };
         }
     });
-    const changes = [];
+    const changes: Change[] = [];
     for (const trail of state.trails) {
         if (trail.section === null) {
             continue;
@@ -141,37 +153,55 @@ function previewChanges() {
                     changeCommand.from === trail.operationStatus) &&
                 changeCommand.to !== trail.operationStatus
             ) {
-                changes.push({
-                    trailName: trail.name,
-                    trail: trail,
-                    operationStatus: {
-                        from: trail.operationStatus,
-                        to: changeCommand.to,
-                    },
-                });
+                changes.push(
+                    new Change(trail, { operationalStatus: changeCommand.to })
+                );
             }
         }
     }
+    state.changes = changes;
+}
+function displayChanges() {
     const listItem = createElement(`
         <div class="list-group mb-3">
         </div>
             `);
-    for (const change of changes) {
-        const listGroupItem = createElement(`
-             <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-start">
+    for (const change of state.changes) {
+        if (!change.changeSet) {
+            continue;
+        }
+        if (change.changeSet.operationalStatus == undefined) {
+            continue;
+        }
+
+        const listGroupItem = <HTMLAnchorElement>createElement(`
+             <a href="#" id="change-${
+                 change.trail.id
+             }" class="list-group-item list-group-item-action d-flex justify-content-between align-items-start">
                 <div class="me-auto">
-                    <div class="fw-bold">${change.trail.name} ${getIconForTrailRating(change.trail.rating)}</div>
+                    <div class="fw-bold">${
+                        change.trail.name
+                    } ${getIconForTrailRating(change.trail.rating)}</div>
                     <div>Operation Status:</div>
-                    ${capitalize(change.operationStatus.from)} -> ${capitalize(
-            change.operationStatus.to
-        )}
+                    ${capitalize(
+                        change.trail.operationStatus
+                    )} -> ${capitalize(change.changeSet.operationalStatus)}
                 </div>
-                <input class="me-1" type="checkbox" checked="true" value="true">
+                <div>
+                    <input class="me-1" type="checkbox" checked="true" value="true">
+                    <div>
+                        <div class="d-none bv-applying spinner-border spinner-border-sm" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <i class="d-none bv-done bi bi-check-circle-fill green"></i>
+                    </div>
+                </div>
             </a>
             `);
-        listGroupItem.addEventListener('onclick', function () {
+        listGroupItem.onclick = function () {
             const input = listGroupItem.querySelector('input')!;
             input.checked = !input.checked;
+            change.enabled = input.checked;
             const div = listGroupItem.querySelector('div.me-auto')!;
             if (input.checked) {
                 div.classList.remove('opacity-25');
@@ -179,28 +209,123 @@ function previewChanges() {
                 div.classList.add('opacity-25');
             }
             return false;
-        });
+        };
         listItem.appendChild(listGroupItem);
     }
     const previewContainer = document.querySelector(
         '#section-preview-container'
     )!;
-    previewContainer.appendChild(listItem);
+    previewContainer.replaceChildren(listItem);
+}
+
+function updateProgressBar(current: number, total: number) {
+    const progress: HTMLDivElement = document
+        .querySelector('#section-preview')!
+        .querySelector('div.progress')!;
+    const progressBar: HTMLDivElement =
+        progress.querySelector('div.progress-bar')!;
+    progress.classList.remove('d-none');
+    if (total === 0) {
+        current = 0;
+        total = 1;
+    }
+    const percentage = Math.round((current / total) * 100);
+    const width = `${percentage}%`;
+    progressBar.style.width = width;
+    progressBar.ariaValueNow = percentage.toString();
+    progressBar.ariaValueMax = '100';
+    progressBar.ariaValueMin = '0';
+}
+
+async function applyChanges() {
+    const changes = state.changes.filter((change) => change.enabled);
+    const changesCount = changes.length;
+    var current = 0;
+    document.querySelector('#section-preview-apply')!.textContent =
+        'Applying changes...';
+    updateProgressBar(current, changesCount);
+    document.querySelector('#section-preview-apply')!.classList.add('disabled');
+    document
+        .querySelector('#section-changes-preview')!
+        .classList.add('disabled');
+    document.querySelectorAll('a.list-group-item-action').forEach((a) => {
+        if (a.id.startsWith('change-')) {
+            a.classList.add('disabled');
+        }
+    });
+
+    for (const change of changes) {
+        const changeRow = document.querySelector(`#change-${change.trail.id}`)!;
+        changeRow.querySelector('.bv-applying')!.classList.remove('d-none');
+        await applyChange(change);
+        updateProgressBar(++current, changesCount);
+        changeRow.querySelector('.bv-applying')!.classList.add('d-none');
+        changeRow.querySelector('.bv-done')!.classList.remove('d-none');
+    }
+}
+
+function getTrailFromState(id: String | null): Trail | null {
+    if (id === null) {
+        return null;
+    }
+
+    for (const trail of state.trails) {
+        if (trail.id === id) {
+            return trail;
+        }
+    }
+    return null;
+}
+
+async function applyChange(change: Change) {
+    if (!change.enabled) {
+        return;
+    }
+    const trail = getTrailFromState(change.trail.id);
+    change.trail = trail!;
+    if (!change.hasChanges()) {
+        return;
+    }
+
+    const response = await chrome.runtime.sendMessage({
+        type: 'applyChange',
+        change: change.toJsonObject(),
+    });
+
+    const timeout = Date.now() + 60 * 1000;
+    while (Date.now() < timeout) {
+        const newTrail = getTrailFromState(change.trail.id);
+        if (newTrail != null) {
+            change.trail = newTrail;
+            if (!change.hasChanges()) {
+                await sleep(1000);
+                return;
+            }
+        }
+        await sleep(100);
+    }
+    console.log('Failed to update ' + change.trail.name, change);
 }
 
 window.addEventListener('load', function () {
     document
         .querySelector('#section-changes-preview')!
         .addEventListener('click', previewChanges);
-    chrome.runtime.sendMessage({ type: 'getTrailData' });
+    document
+        .querySelector('#section-preview-apply')!
+        .addEventListener('click', applyChanges);
+    chrome.runtime.sendMessage({ type: 'getTrailData' }, handleMessages);
 });
 
 // Event listener
 function handleMessages(
     message: any,
-    sender: chrome.runtime.MessageSender,
-    sendResponse: (response?: any) => void
+    sender: chrome.runtime.MessageSender | null = null,
+    sendResponse: ((response?: any) => void) | null = null
 ) {
+    if (!('type' in message)) {
+        return false;
+    }
     if (message.type === 'trailData') {
         state.sections = message.sections;
         state.states = message.states;

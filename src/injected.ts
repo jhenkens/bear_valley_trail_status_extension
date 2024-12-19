@@ -7,12 +7,20 @@ import {
 import type { Trail } from './util/trail';
 import { debounce } from './util/util';
 
-function sortTrails(trailsComponent: any, trails: Trail[]): void {
+type State = {
+    retries: number;
+};
+
+const state: State = { retries: 10 };
+
+function sortTrails(trailsComponent: any): void {
+    const trails: Trail[] = getTrailsFromAngular(trailsComponent);
     trails.sort((a, b) => a!.compareTo(b!));
     trailsComponent.rowData = trails.map((trail) => trail!.ngRow);
 }
 
-function addSectionToTable(trailsFromAgular: Trail[]) {
+function addSectionToTable(trailsComponent: any) {
+    const trailsFromAgular: Trail[] = getTrailsFromAngular(trailsComponent);
     const table = getTrailsListTable()!;
     const rows = table.querySelector('tbody')!.querySelectorAll('tr')!;
     const header = table.querySelector('thead')!;
@@ -27,20 +35,41 @@ function addSectionToTable(trailsFromAgular: Trail[]) {
             nameHeader.nextSibling
         );
     }
-    for (const row of rows) {
+    if (rows.length != trailsFromAgular.length) {
+        console.error('Row count mismatch between table and angular');
+        if (state.retries > 0) {
+            setTimeout(sortAndAddSectionToTable, 1000);
+            state.retries--;
+        }
+        return;
+    }
+    const zipped = Array.from(rows).map((row, index) => {
+        return { row, trail: trailsFromAgular[index] };
+    });
+    for (const { row, trail } of zipped) {
         const trailNameRow = row.querySelector('td.col-name')!;
         const trailName = trailNameRow.textContent!.trim();
-        const allTrailData = trailsFromAgular.filter(
-            (trail) => trail.name === trailName
-        );
-        const trailData = allTrailData.length > 0 ? allTrailData[0] : null;
+        if (trailName !== trail.name) {
+            console.error(
+                'Trail name mismatch between table and angular',
+                row,
+                trail
+            );
+            if (state.retries > 0) {
+                setTimeout(sortAndAddSectionToTable, 1000);
+                state.retries--;
+            }
+            return;
+        }
 
-        var sectionName = trailData?.section ?? 'Unknown';
-        var sectionColRow: Element | null = row.querySelector('td.col-section');
+        var sectionName = trail.section ?? 'Unknown';
+        const id = trail.idForSection();
+        var sectionColRow: Element | null = row.querySelector(`#${id}`);
         if (sectionColRow === null) {
             sectionColRow = <Element>trailNameRow.cloneNode(true);
             sectionColRow.textContent = sectionName;
             sectionColRow.className = 'col-section';
+            sectionColRow.id = id;
             trailNameRow.parentNode!.insertBefore(
                 sectionColRow,
                 trailNameRow.nextSibling
@@ -54,10 +83,14 @@ const sortAndAddSectionToTable = debounce(() => {
         console.log('Sorting and adding sections to table...');
         const trailsComponent = getTrailsListAngularComponent();
         const trails = getTrailsFromAngular(trailsComponent);
-        sortTrails(trailsComponent, trails);
-        addSectionToTable(trails);
+        sortTrails(trailsComponent);
+        // get them again, so that we have the sorted order
+        setTimeout(() => {
+            addSectionToTable(getTrailsListAngularComponent());
+            state.retries = 10;
+        }, 250);
     }
-});
+}, 250);
 
 let observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation: MutationRecord) => {
@@ -84,3 +117,11 @@ observer.observe(document.body, {
     childList: true,
     characterData: true,
 });
+
+declare global {
+    interface Window {
+        getTrailsListAngularComponent: () => any;
+    }
+}
+
+window.getTrailsListAngularComponent = getTrailsListAngularComponent;

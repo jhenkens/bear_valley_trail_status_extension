@@ -2,9 +2,20 @@ import type { TrailRating } from './constants';
 import { getSectionOrder, getTrailRating } from './constants';
 import { compareStrings, parseBoolExact } from './util';
 
+type TrailJson = {
+    name: string;
+    section: string | null;
+    id: string | null;
+    operationStatus: string;
+    groomingStatus: boolean;
+    snowmakingStatus: boolean;
+    rating: TrailRating;
+};
+
 class Trail {
     name: string;
     section: string | null;
+    id: string | null;
     operationStatus: string;
     groomingStatus: boolean;
     snowmakingStatus: boolean;
@@ -15,6 +26,7 @@ class Trail {
     constructor(
         name: string,
         section: string | null,
+        id: string | null,
         operationStatus: string,
         groomingStatus: boolean,
         snowmakingStatus: boolean,
@@ -23,6 +35,7 @@ class Trail {
     ) {
         this.name = name;
         this.section = section;
+        this.id = id;
         this.operationStatus = operationStatus;
         this.groomingStatus = groomingStatus;
         this.snowmakingStatus = snowmakingStatus;
@@ -36,9 +49,19 @@ class Trail {
         }
     }
 
+    public idForSection(): string {
+        return `trail-${this.id}-section`;
+    }
+
+    public static parseIdFromSectionId(sectionId: string): string {
+        return sectionId.split('-').slice(1, -1).join('-');
+    }
+
     public compareTo(other: Trail): number {
         if (this.section !== other.section) {
-            return getSectionOrder(this.section) - getSectionOrder(other.section);
+            return (
+                getSectionOrder(this.section) - getSectionOrder(other.section)
+            );
         }
         if (this.rating !== other.rating) {
             return this.rating.valueOf() - other.rating.valueOf();
@@ -48,9 +71,13 @@ class Trail {
 
     public static fromDomRow(row: HTMLTableRowElement): Trail | null {
         const trailName = row.querySelector('td.col-name')!.textContent!.trim();
-        const sectionName: string | undefined = row
-            .querySelector('td.col-section')
-            ?.textContent?.trim();
+        const sectionColRow = row.querySelector('td.col-section');
+        var id: string | null = null;
+        var section: string | null = null;
+        if (sectionColRow !== null) {
+            id = this.parseIdFromSectionId(sectionColRow.id);
+            section = sectionColRow.textContent?.trim() ?? null;
+        }
         const operationStatus = row
             .querySelector('td.col-operation-status')!
             .textContent!.toLowerCase();
@@ -73,7 +100,8 @@ class Trail {
         );
         return new Trail(
             trailName,
-            sectionName ?? null,
+            section,
+            id,
             operationStatus,
             parseBoolExact(groomingStatus),
             parseBoolExact(snowmakingStatus),
@@ -85,6 +113,7 @@ class Trail {
     public static fromNgRow(row: any): Trail | null {
         const trailName = row.data.name.trim();
         const sectionName = row.data._extension.value.mountainArea.trim();
+        const id = row.data.id;
         const operationStatus = row.data.operationStatus.label.toLowerCase();
         const groomingStatus = row.data.grooming;
         const snowmakingStatus = row.data.snowMaking;
@@ -92,6 +121,7 @@ class Trail {
         return new Trail(
             trailName,
             sectionName,
+            id,
             operationStatus,
             groomingStatus,
             snowmakingStatus,
@@ -103,21 +133,16 @@ class Trail {
     public static fromJsonObject({
         name,
         section,
+        id,
         operationStatus,
         groomingStatus,
         snowmakingStatus,
         rating,
-    }: {
-        name: string;
-        section: string | null;
-        operationStatus: string;
-        groomingStatus: boolean;
-        snowmakingStatus: boolean;
-        rating: TrailRating;
-    }): Trail {
+    }: TrailJson): Trail {
         return new Trail(
             name,
             section,
+            id,
             operationStatus,
             groomingStatus,
             snowmakingStatus,
@@ -125,10 +150,11 @@ class Trail {
         );
     }
 
-    public toJsonObject(){
+    public toJsonObject(): TrailJson {
         return {
             name: this.name,
             section: this.section,
+            id: this.id,
             operationStatus: this.operationStatus,
             groomingStatus: this.groomingStatus,
             snowmakingStatus: this.snowmakingStatus,
@@ -138,3 +164,4 @@ class Trail {
 }
 
 export { Trail };
+export type { TrailJson };

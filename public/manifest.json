@@ -1,7 +1,7 @@
 {
     "name": "Bear Valley Trail Status Helper",
     "description": "Extension to help manage the trail and lift status on Bear Valley's website",
-    "version": "0.1.1",
+    "version": "0.2.0",
     "manifest_version": 3,
     "icons": {
         "32": "icons/icon_32.png",
@@ -15,7 +15,7 @@
     "action": {
         "default_title": "Click to open panel"
     },
-    "permissions": ["storage", "nativeMessaging", "sidePanel"],
+    "permissions": ["sidePanel"],
     "host_permissions": ["*://cali-pass.control-room.te2.io/*"],
     "content_scripts": [
         {
