@@ -31,7 +31,10 @@ function handleMessages(
     sender: chrome.runtime.MessageSender,
     sendResponse: (response?: any) => void
 ) {
-    if ('type' in message && forwardedMessages.indexOf(message.type) !== -1) {
+    if (message === null || message === undefined || !('type' in message)) {
+        return false;
+    }
+    if (forwardedMessages.indexOf(message.type) !== -1) {
         chrome.tabs.query(
             { active: true, currentWindow: true },
             function (tabs) {

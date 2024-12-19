@@ -3,6 +3,8 @@ import { getIconForTrailRating } from './util/constants';
 import { Trail } from './util/trail';
 import { capitalize, createElement, sleep } from './util/util';
 require('./sidepanel.scss');
+import 'bootstrap-icons/font/bootstrap-icons.css'
+
 
 type State = {
     states: string[];
@@ -323,7 +325,7 @@ function handleMessages(
     sender: chrome.runtime.MessageSender | null = null,
     sendResponse: ((response?: any) => void) | null = null
 ) {
-    if (!('type' in message)) {
+    if (message === null || message === undefined || !('type' in message)) {
         return false;
     }
     if (message.type === 'trailData') {
@@ -342,5 +344,13 @@ function handleMessages(
 }
 
 chrome.runtime.onMessage.addListener(handleMessages);
+
+
+declare global {
+    interface Window {
+        state: State
+    }
+}
+window.state = state;
 
 export {};

@@ -1,6 +1,7 @@
 'use strict';
 
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+const autoprefixer = require('autoprefixer');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 
 const PATHS = require('./paths');
@@ -41,34 +42,35 @@ const common = {
             {
                 test: /\.(scss)$/,
                 use: [
+                    MiniCssExtractPlugin.loader,
                     {
-                        loader: 'style-loader', // inject CSS to page
+                        loader: 'css-loader',
                     },
                     {
-                        loader: 'css-loader', // translates CSS into CommonJS modules
-                    },
-                    {
-                        loader: 'postcss-loader', // Run post css actions
+                        loader: 'postcss-loader',
                         options: {
                             postcssOptions: {
-                                plugins: function () {
-                                    // post css plugins, can be exported to postcss.config.js
-                                    return [
-                                        require('precss'),
-                                        require('autoprefixer'),
-                                    ];
-                                },
+                                plugins: [autoprefixer],
                             },
                         },
                     },
                     {
-                        loader: 'sass-loader', // compiles Sass to CSS
+                        loader: 'sass-loader',
+                        options: {
+                            sassOptions: {
+                                outputStyle: 'expanded',
+                            },
+                        },
                     },
                 ],
             },
             {
-                test: /\.woff2?$/,
+                test: /\.woff($|\?)|\.woff2($|\?)|\.ttf($|\?)|\.eot($|\?)|\.svg($|\?)/i,
                 type: 'asset/resource',
+                generator: {
+                    //filename: 'fonts/[name]-[hash][ext][query]'
+                    filename: 'fonts/[name][ext][query]',
+                },
             },
             // Check for images imported in .js files and
             {
@@ -82,6 +84,14 @@ const common = {
                         },
                     },
                 ],
+            },
+            {
+                mimetype: 'image/svg+xml',
+                scheme: 'data',
+                type: 'asset/resource',
+                generator: {
+                    filename: 'icons/[hash].svg',
+                },
             },
         ],
     },
@@ -99,10 +109,7 @@ const common = {
                 },
             ],
         }),
-        // Extract CSS into separate files
-        new MiniCssExtractPlugin({
-            filename: '[name].css',
-        }),
+        new MiniCssExtractPlugin(),
     ],
 };
 

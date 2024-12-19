@@ -13,7 +13,7 @@ function handleMessages(
     sender: chrome.runtime.MessageSender,
     sendResponse: (response?: any) => void
 ) {
-    if (!('type' in message)) {
+    if (message === null ||  message === undefined || !('type' in message)) {
         return false;
     }
     if (message.type === 'getTrailData') {

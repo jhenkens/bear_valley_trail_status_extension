@@ -10,6 +10,7 @@
     "repack": "npm run build && npm run pack",
     "format": "prettier --write --ignore-unknown \"{config,public,src}/**/*.{html,css,js,ts,json}\""
   },
+  "sideEffects": ["*.css", "*.scss", "*.sass"],
   "devDependencies": {
     "@types/chrome": "^0.0.287",
     "adm-zip": "^0.5.16",
