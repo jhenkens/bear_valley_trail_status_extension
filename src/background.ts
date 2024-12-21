@@ -1,4 +1,7 @@
 'use strict';
+
+import { isValidMessage, type MessageHandler } from './util/message_handler';
+
 const BEAR_VALLEY_ORIGIN = 'https://cali-pass.control-room.te2.io';
 
 // Allows users to open the side panel by clicking on the action toolbar icon
@@ -26,12 +29,12 @@ chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
 });
 
 const forwardedMessages = ['applyChange', 'getTrailData'];
-function handleMessages(
-    message: any,
-    sender: chrome.runtime.MessageSender,
-    sendResponse: (response?: any) => void
+const handleMessages: MessageHandler = function (
+    message,
+    sender,
+    sendResponse
 ) {
-    if (message === null || message === undefined || !('type' in message)) {
+    if (!isValidMessage(message)) {
         return false;
     }
     if (forwardedMessages.indexOf(message.type) !== -1) {
@@ -39,7 +42,7 @@ function handleMessages(
             { active: true, currentWindow: true },
             function (tabs) {
                 if (tabs.length !== 0 && tabs[0].id !== undefined) {
-                    chrome.tabs.sendMessage(tabs[0].id, message, sendResponse);
+                    chrome.tabs.sendMessage(tabs[0].id, message, sendResponse!);
                 }
             }
         );
@@ -47,7 +50,7 @@ function handleMessages(
     }
 
     return false;
-}
+};
 
 chrome.runtime.onMessage.addListener(handleMessages);
 

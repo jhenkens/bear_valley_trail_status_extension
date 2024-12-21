@@ -9,6 +9,17 @@ function parseBoolExact(value: string): boolean {
     throw new Error(`Invalid boolean value: ${value}`);
 }
 
+function parseActiveInactiveExact(value: string): boolean {
+    const lowerValue = value.toLowerCase();
+    if (lowerValue === 'active') {
+        return true;
+    }
+    if (lowerValue === 'inactive') {
+        return false;
+    }
+    throw new Error(`Invalid boolean value: ${value}`);
+}
+
 function compareStrings(
     a: string | undefined | null,
     b: string | undefined | null
@@ -98,6 +109,7 @@ const sleep = (delay: number) =>
 export {
     sleep,
     parseBoolExact,
+    parseActiveInactiveExact,
     compareStrings,
     debounce,
     trNodeMutationFilter,

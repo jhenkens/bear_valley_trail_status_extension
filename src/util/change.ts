@@ -1,7 +1,7 @@
 import { Trail, type TrailJson } from './trail';
 
 type ChangeSet = {
-    operationalStatus?: string;
+    statusOverride?: string;
 };
 type ChangeJson = {
     trail: TrailJson;
@@ -35,8 +35,8 @@ class Change {
 
     public hasChanges() {
         if (
-            this.changeSet.operationalStatus !== undefined &&
-            this.changeSet.operationalStatus !== this.trail.operationStatus
+            this.changeSet.statusOverride !== undefined &&
+            this.changeSet.statusOverride !== this.trail.effectiveStatus
         ) {
             return true;
         }

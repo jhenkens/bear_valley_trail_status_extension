@@ -112,8 +112,8 @@ const common = {
         new MiniCssExtractPlugin(),
     ],
     optimization: {
-        minimize: false
-    }
+        minimize: false,
+    },
 };
 
 module.exports = common;

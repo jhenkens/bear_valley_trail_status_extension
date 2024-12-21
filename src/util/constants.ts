@@ -7,6 +7,8 @@ const sectionMappings: Array<[RegExp, number]> = [
     [new RegExp(/^\s*Village.*/, 'i'), 5],
 ];
 
+const AUTOMATIC_STATUS: string = 'Automatic';
+
 enum TrailRating {
     Green = 1,
     Blue = 2,
@@ -88,4 +90,10 @@ function getTrailRating(trailIconName: string): TrailRating {
     );
 }
 
-export { TrailRating, getSectionOrder, getTrailRating, getIconForTrailRating };
+export {
+    TrailRating,
+    getSectionOrder,
+    getTrailRating,
+    getIconForTrailRating,
+    AUTOMATIC_STATUS,
+};

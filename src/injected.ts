@@ -7,11 +7,11 @@ import {
 import type { Trail } from './util/trail';
 import { debounce } from './util/util';
 
-type State = {
+type InjectedState = {
     retries: number;
 };
 
-const state: State = { retries: 10 };
+const state: InjectedState = { retries: 10 };
 
 function sortTrails(trailsComponent: any): void {
     const trails: Trail[] = getTrailsFromAngular(trailsComponent);

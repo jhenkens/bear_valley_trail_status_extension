@@ -1,6 +1,10 @@
 import type { TrailRating } from './constants';
-import { getSectionOrder, getTrailRating } from './constants';
-import { compareStrings, parseBoolExact } from './util';
+import { AUTOMATIC_STATUS, getSectionOrder, getTrailRating } from './constants';
+import {
+    compareStrings,
+    parseActiveInactiveExact,
+    parseBoolExact,
+} from './util';
 
 type TrailJson = {
     name: string;
@@ -9,6 +13,8 @@ type TrailJson = {
     operationStatus: string;
     groomingStatus: boolean;
     snowmakingStatus: boolean;
+    automaticStatus: boolean;
+    statusOverride: string | null;
     rating: TrailRating;
 };
 
@@ -19,6 +25,8 @@ class Trail {
     operationStatus: string;
     groomingStatus: boolean;
     snowmakingStatus: boolean;
+    automaticStatus: boolean;
+    statusOverride: string | null;
     rating: TrailRating;
     domRow: HTMLTableRowElement | null = null;
     ngRow: any = null;
@@ -30,6 +38,8 @@ class Trail {
         operationStatus: string,
         groomingStatus: boolean,
         snowmakingStatus: boolean,
+        automaticStatus: boolean,
+        statusOverride: string | null,
         rating: TrailRating,
         origin: { domRow: HTMLTableRowElement } | { ngRow: any } | null = null
     ) {
@@ -39,6 +49,8 @@ class Trail {
         this.operationStatus = operationStatus;
         this.groomingStatus = groomingStatus;
         this.snowmakingStatus = snowmakingStatus;
+        this.automaticStatus = automaticStatus;
+        this.statusOverride = statusOverride;
         this.rating = rating;
         if (origin !== null) {
             if ('domRow' in origin) {
@@ -47,6 +59,10 @@ class Trail {
                 this.ngRow = origin.ngRow;
             }
         }
+    }
+
+    public get effectiveStatus(): string | null {
+        return this.automaticStatus ? AUTOMATIC_STATUS : this.statusOverride;
     }
 
     public idForSection(): string {
@@ -81,6 +97,15 @@ class Trail {
         const operationStatus = row
             .querySelector('td.col-operation-status')!
             .textContent!.toLowerCase();
+        const automaticStatus = row
+            .querySelector('td.col-automatic-status div.cr-toggle-message')!
+            .textContent!.toLowerCase();
+        const statusOverride = row
+            .querySelector(
+                'td.col-status-override div[data-local-qa-id="dropdown"] div.selection-text'
+            )!
+            .textContent!.toLowerCase()
+            .trim();
         const groomingStatus = row
             .querySelector('td.col-grooming-status div.cr-toggle-message')!
             .textContent!.toLowerCase();
@@ -105,6 +130,8 @@ class Trail {
             operationStatus,
             parseBoolExact(groomingStatus),
             parseBoolExact(snowmakingStatus),
+            parseActiveInactiveExact(automaticStatus),
+            statusOverride,
             rating,
             { domRow: row }
         );
@@ -115,6 +142,12 @@ class Trail {
         const sectionName = row.data._extension.value.mountainArea.trim();
         const id = row.data.id;
         const operationStatus = row.data.operationStatus.label.toLowerCase();
+        const statusOverride =
+            row.data.statusOptions
+                .find((e: any) => e.isSelected)
+                ?.label?.toLowerCase()
+                ?.trim() ?? null;
+        const automaticStatus = row.data.autoStatus;
         const groomingStatus = row.data.grooming;
         const snowmakingStatus = row.data.snowMaking;
         const rating = getTrailRating(row.data.iconType);
@@ -125,6 +158,8 @@ class Trail {
             operationStatus,
             groomingStatus,
             snowmakingStatus,
+            automaticStatus,
+            statusOverride,
             rating,
             { ngRow: row }
         );
@@ -137,6 +172,8 @@ class Trail {
         operationStatus,
         groomingStatus,
         snowmakingStatus,
+        automaticStatus,
+        statusOverride,
         rating,
     }: TrailJson): Trail {
         return new Trail(
@@ -146,6 +183,8 @@ class Trail {
             operationStatus,
             groomingStatus,
             snowmakingStatus,
+            automaticStatus,
+            statusOverride,
             rating
         );
     }
@@ -158,6 +197,8 @@ class Trail {
             operationStatus: this.operationStatus,
             groomingStatus: this.groomingStatus,
             snowmakingStatus: this.snowmakingStatus,
+            automaticStatus: this.automaticStatus,
+            statusOverride: this.statusOverride,
             rating: this.rating,
         };
     }

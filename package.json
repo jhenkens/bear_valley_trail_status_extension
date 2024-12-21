@@ -1,11 +1,12 @@
 {
   "name": "bear_valley_trail_status_extension",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "My Chrome Extension",
   "private": true,
   "scripts": {
+    "update_manifest": "node update_manifest.js",
     "watch": "webpack --mode=development --watch --config config/webpack.config.js",
-    "build": "webpack --mode=production --config config/webpack.config.js",
+    "build": "npm run update_manifest && webpack --mode=production --config config/webpack.config.js",
     "repack": "npm run build && node pack.js",
     "format": "prettier --write --ignore-unknown \"{config,public,src}/**/*.{html,css,js,ts,json}\""
   },

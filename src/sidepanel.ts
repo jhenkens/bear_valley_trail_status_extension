@@ -1,23 +1,17 @@
 import { Change } from './util/change';
-import { getIconForTrailRating } from './util/constants';
+import { AUTOMATIC_STATUS, getIconForTrailRating } from './util/constants';
+import {
+    handleTrailDataMessage,
+    isValidMessage,
+    type ApplyChangeMessage,
+    type MessageHandler,
+    type TrailDataMessage,
+} from './util/message_handler';
+import { getTrailFromState, state, type State } from './util/state';
 import { Trail } from './util/trail';
 import { capitalize, createElement, sleep } from './util/util';
 require('./sidepanel.scss');
-import 'bootstrap-icons/font/bootstrap-icons.css'
-
-
-type State = {
-    states: string[];
-    sections: string[];
-    trails: Trail[];
-    changes: Change[];
-};
-const state: State = {
-    states: [],
-    sections: [],
-    trails: [],
-    changes: [],
-};
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 function addSection(section: string) {
     const sectionId =
@@ -72,7 +66,8 @@ function updateNoChanges(sectionId: string) {
 function addChangeToSection(sectionId: string) {
     const sectionStatus = document.querySelector(`#${sectionId}`)!;
     const ul = sectionStatus.querySelector('ul')!;
-    const options = state.states
+    const options = [AUTOMATIC_STATUS]
+        .concat(state.states)
         .map(
             (state) => `<option value="${state}">${capitalize(state)}</option>`
         )
@@ -90,7 +85,7 @@ function addChangeToSection(sectionId: string) {
                 ${options}
             </select>
             </div>
-        <span><button type="button" class="btn-close" aria-label="Close"></button></span>
+        <span><button type="button" class="btn-close bv-remove-change" aria-label="Close"></button></span>
         </li>
         `
     );
@@ -106,6 +101,16 @@ function addChangeToSection(sectionId: string) {
 function previewChanges() {
     calculateChanges();
     displayChanges();
+}
+
+function fromMatchesTrail(from: string, trail: Trail) {
+    if (from === '*') {
+        return true;
+    }
+    return trail.effectiveStatus === from;
+}
+function toMatchesTrail(to: string, trail: Trail) {
+    return to !== trail.effectiveStatus;
 }
 function calculateChanges() {
     const sectionStatusContainer = document.querySelector(
@@ -151,12 +156,11 @@ function calculateChanges() {
         }
         for (const changeCommand of currentSectionChanges.changes) {
             if (
-                (changeCommand.from === '*' ||
-                    changeCommand.from === trail.operationStatus) &&
-                changeCommand.to !== trail.operationStatus
+                fromMatchesTrail(changeCommand.from, trail) &&
+                toMatchesTrail(changeCommand.to, trail)
             ) {
                 changes.push(
-                    new Change(trail, { operationalStatus: changeCommand.to })
+                    new Change(trail, { statusOverride: changeCommand.to })
                 );
             }
         }
@@ -172,7 +176,7 @@ function displayChanges() {
         if (!change.changeSet) {
             continue;
         }
-        if (change.changeSet.operationalStatus == undefined) {
+        if (change.changeSet.statusOverride == undefined) {
             continue;
         }
 
@@ -186,8 +190,8 @@ function displayChanges() {
                     } ${getIconForTrailRating(change.trail.rating)}</div>
                     <div>Operation Status:</div>
                     ${capitalize(
-                        change.trail.operationStatus
-                    )} -> ${capitalize(change.changeSet.operationalStatus)}
+                        change.trail.effectiveStatus!
+                    )} -> ${capitalize(change.changeSet.statusOverride)}
                 </div>
                 <div>
                     <input class="me-1" type="checkbox" checked="true" value="true">
@@ -240,13 +244,54 @@ function updateProgressBar(current: number, total: number) {
     progressBar.ariaValueMin = '0';
 }
 
+function updateRunningState(running: boolean) {
+    document.querySelector('#section-preview-apply')!.textContent = running
+        ? 'Applying changes...'
+        : 'Apply changes';
+    document
+        .querySelector('#section-preview-apply')!
+        .classList.toggle('disabled', running);
+    document
+        .querySelector('#section-changes-preview')!
+        .classList.toggle('disabled', running);
+    document.querySelectorAll('a.list-group-item-action').forEach((a) => {
+        if (a.id.startsWith('change-')) {
+            a.classList.toggle('disabled', running);
+        }
+    });
+    const progressBar = document.querySelector(
+        '#section-preview div.progress-bar'
+    )!;
+    progressBar.classList.toggle('progress-bar-animated', running);
+    progressBar.classList.toggle('progress-bar-striped', running);
+    document
+        .querySelector('#section-preview div.bv-done')!
+        .classList.toggle('d-none', running);
+}
+
+function updateTrailRunningState(
+    trail: Element,
+    running: boolean | null,
+    failed: boolean | null
+) {
+    running = running ?? false;
+    failed = failed ?? false;
+    const hideApplying = !running;
+    const hideDone = running || failed;
+    const hideFailed = running || !failed;
+    trail
+        .querySelector('.bv-applying')!
+        .classList.toggle('d-none', hideApplying);
+    trail.querySelector('.bv-done')!.classList.toggle('d-none', hideDone);
+    trail.querySelector('.bv-failed')!.classList.toggle('d-none', hideFailed);
+}
+
 async function applyChanges() {
     const changes = state.changes.filter((change) => change.enabled);
     const changesCount = changes.length;
     var current = 0;
-    document.querySelector('#section-preview-apply')!.textContent =
-        'Applying changes...';
     updateProgressBar(current, changesCount);
+    updateRunningState(true);
     document.querySelector('#section-preview-apply')!.classList.add('disabled');
     document
         .querySelector('#section-changes-preview')!
@@ -259,29 +304,17 @@ async function applyChanges() {
 
     for (const change of changes) {
         const changeRow = document.querySelector(`#change-${change.trail.id}`)!;
-        changeRow.querySelector('.bv-applying')!.classList.remove('d-none');
+        updateTrailRunningState(changeRow, true, null);
         await applyChange(change);
         updateProgressBar(++current, changesCount);
-        changeRow.querySelector('.bv-applying')!.classList.add('d-none');
-        if(change.hasChanges()) {
-            changeRow.querySelector('.bv-failed')!.classList.remove('d-none');
-        }else{
-            changeRow.querySelector('.bv-done')!.classList.remove('d-none');
-        }
+        updateTrailRunningState(changeRow, false, change.hasChanges());
     }
-}
-
-function getTrailFromState(id: String | null): Trail | null {
-    if (id === null) {
-        return null;
-    }
-
-    for (const trail of state.trails) {
-        if (trail.id === id) {
-            return trail;
-        }
-    }
-    return null;
+    document
+        .querySelectorAll('button.bv-remove-change')!
+        .forEach((btn) => (<HTMLButtonElement>btn).click());
+    await sleep(100);
+    previewChanges();
+    updateRunningState(false);
 }
 
 async function applyChange(change: Change) {
@@ -294,29 +327,41 @@ async function applyChange(change: Change) {
         return;
     }
 
-    const response = await chrome.runtime.sendMessage({
-        type: 'applyChange',
-        change: change.toJsonObject(),
-    });
-
+    for (let i = 0; i < 3; i++) {
+        const message: ApplyChangeMessage = {
+            type: 'applyChange',
+            change: change.toJsonObject(),
+        };
+        const response = await chrome.runtime.sendMessage(message);
+        if (response && 'success' in response && response.success === true) {
+            break;
+        }
+        await sleep(2000);
+    }
     const timeout = Date.now() + 60 * 1000;
+    var refreshCount = 10;
     while (Date.now() < timeout) {
-        await sleep(1000);
+        await sleep(100);
         const newTrail = getTrailFromState(change.trail.id);
         if (newTrail != null) {
             change.trail = newTrail;
             if (!change.hasChanges()) {
-                await sleep(1000);
+                await sleep(100);
                 return;
             }
         }
-        getTrailData()
+        if (--refreshCount <= 0) {
+            getTrailData();
+            refreshCount = 10;
+        }
     }
     console.log('Failed to update ' + change.trail.name, change);
 }
 
-function getTrailData(){
-    chrome.runtime.sendMessage({ type: 'getTrailData' }, handleMessages);
+function getTrailData() {
+    chrome.runtime.sendMessage({ type: 'getTrailData' }, (r) =>
+        handleMessages(r, null, null)
+    );
 }
 
 window.addEventListener('load', function () {
@@ -326,24 +371,19 @@ window.addEventListener('load', function () {
     document
         .querySelector('#section-preview-apply')!
         .addEventListener('click', applyChanges);
-    getTrailData()
+    getTrailData();
 });
 
-// Event listener
-function handleMessages(
-    message: any,
-    sender: chrome.runtime.MessageSender | null = null,
-    sendResponse: ((response?: any) => void) | null = null
+const handleMessages: MessageHandler = function (
+    message,
+    sender,
+    sendResponse
 ) {
-    if (message === null || message === undefined || !('type' in message)) {
+    if (!isValidMessage(message)) {
         return false;
     }
     if (message.type === 'trailData') {
-        state.sections = message.sections;
-        state.states = message.states;
-        state.trails = message.trails
-            .map(Trail.fromJsonObject)
-            .sort((a: Trail, b: Trail) => a.compareTo(b));
+        handleTrailDataMessage(<TrailDataMessage>message);
         for (const section of state.sections) {
             addSection(section);
         }
@@ -351,14 +391,13 @@ function handleMessages(
     }
 
     return false;
-}
+};
 
 chrome.runtime.onMessage.addListener(handleMessages);
 
-
 declare global {
     interface Window {
-        state: State
+        state: State;
     }
 }
 window.state = state;
