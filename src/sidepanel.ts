@@ -306,6 +306,7 @@ async function applyChanges() {
         const changeRow = document.querySelector(`#change-${change.trail.id}`)!;
         updateTrailRunningState(changeRow, true, null);
         await applyChange(change);
+        updateChangeWithState(change);
         updateProgressBar(++current, changesCount);
         updateTrailRunningState(changeRow, false, change.hasChanges());
     }
@@ -315,6 +316,14 @@ async function applyChanges() {
     await sleep(100);
     previewChanges();
     updateRunningState(false);
+}
+
+function updateChangeWithState(change: Change) {
+    const trail = getTrailFromState(change.trail.id);
+    if(trail === null) {
+        return;
+    }
+    change.trail = trail;
 }
 
 async function applyChange(change: Change) {
@@ -333,26 +342,25 @@ async function applyChange(change: Change) {
             change: change.toJsonObject(),
         };
         const response = await chrome.runtime.sendMessage(message);
-        if (response && 'success' in response && response.success === true) {
-            break;
+        if (response && 'success' in response && response.success !== true) {
+            await sleep(5000);
+            console.log("Error applying change, retrying", response);
+            continue;
         }
         await sleep(2000);
-    }
-    const timeout = Date.now() + 60 * 1000;
-    var refreshCount = 10;
-    while (Date.now() < timeout) {
-        await sleep(100);
-        const newTrail = getTrailFromState(change.trail.id);
-        if (newTrail != null) {
-            change.trail = newTrail;
-            if (!change.hasChanges()) {
+        const timeout = Date.now() + 10 * 1000;
+        var refreshCount = 10;
+        while (Date.now() < timeout) {
+            await sleep(100);
+            updateChangeWithState(change);
+            if(!change.hasChanges()) {
                 await sleep(100);
                 return;
             }
-        }
-        if (--refreshCount <= 0) {
-            getTrailData();
-            refreshCount = 10;
+            if (--refreshCount <= 0) {
+                getTrailData();
+                refreshCount = 10;
+            }
         }
     }
     console.log('Failed to update ' + change.trail.name, change);
